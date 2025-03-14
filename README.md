@@ -109,8 +109,8 @@ docker-compose up -d
 2. Make sure the proxy server is running
 3. Click the extension icon in the Firefox toolbar or press `Ctrl+Shift+O` to open the sidebar
 2. Configure your settings (Ollama endpoint, model name, etc.)
-- When using a proxy server directly on your host: Set endpoint to http://localhost:11434 and your desired model name
-- When using a proxy server as a Docker container: Set endpoint to http://host.docker.internal:11434 and your desired model name
+- When using a proxy server directly on your host: Set endpoint to `http://localhost:11434` and your desired model name
+- When using a proxy server as a Docker container: Set endpoint to `http://host.docker.internal:11434` and your desired model name
 3. Browse to any webpage you want to analyze
 4. Click "Summarize This Page" to generate a summary
 5. Use the suggested questions or ask your own in the chat interface
