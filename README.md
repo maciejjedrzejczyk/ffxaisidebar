@@ -16,7 +16,7 @@ This project consists of two main components:
 
 2. **Proxy Server**: A Python-based proxy that:
    - Handles CORS issues between the browser and local LLM servers
-   - Forwards requests from the extension to Ollama/LM Studio
+   - Forwards requests from the extension to Ollama
    - Returns AI responses to the extension
 
 The extension works with locally running LLM models on Ollama, giving you privacy and control over your AI interactions while browsing the web.
@@ -108,7 +108,7 @@ Alternatively, you can use Docker Compose:
 
 ## Using the Extension
 
-1. Make sure your LLM server (Ollama or LM Studio) is running
+1. Make sure your LLM server (Ollama) is running
 2. Make sure the proxy server is running
 3. Click the extension icon in the Firefox toolbar to open the sidebar
 4. Configure the settings:
