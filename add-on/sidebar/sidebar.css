@@ -237,6 +237,21 @@ button:disabled {
   vertical-align: middle;
 }
 
+.reset-button {
+  background-color: #d70022; /* Firefox's warning red */
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.reset-button:hover {
+  background-color: #b1000c;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

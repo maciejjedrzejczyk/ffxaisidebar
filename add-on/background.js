@@ -3,31 +3,58 @@ browser.browserAction.onClicked.addListener(() => {
   browser.sidebarAction.toggle();
 });
 
+// Add this to your background.js
+let activeTabId = null;
+
 // Listen for tab changes to update the sidebar content
 browser.tabs.onActivated.addListener((activeInfo) => {
-  browser.sidebarAction.isOpen({}).then((isOpen) => {
-    if (isOpen) {
-      browser.tabs.sendMessage(activeInfo.tabId, { action: "checkForSidebar" })
-        .catch(() => {
-          // Tab doesn't have content script yet, do nothing
-        });
-    }
-  });
+  console.log("Tab activated:", activeInfo.tabId);
+  notifySidebarOfPageChange(activeInfo.tabId);
 });
 
 // Listen for navigation completion to update the sidebar
 browser.webNavigation.onCompleted.addListener((details) => {
   if (details.frameId === 0) { // Main frame only
-    browser.sidebarAction.isOpen({}).then((isOpen) => {
-      if (isOpen) {
-        browser.tabs.sendMessage(details.tabId, { action: "checkForSidebar" })
-          .catch(() => {
-            // Tab doesn't have content script yet, do nothing
-          });
-      }
-    });
+    console.log("Navigation completed:", details.tabId, details.url);
+    notifySidebarOfPageChange(details.tabId);
   }
 });
+
+
+// Helper function to notify sidebar of page changes
+function notifySidebarOfPageChange(tabId) {
+  // First check if sidebar is open
+  browser.sidebarAction.isOpen({}).then((isOpen) => {
+    if (isOpen) {
+      // Get tab info
+      browser.tabs.get(tabId).then((tab) => {
+        // Notify the sidebar directly about the page change
+        browser.runtime.sendMessage({
+          action: "pageChanged",
+          tabId: tab.id,
+          url: tab.url,
+          title: tab.title
+        }).catch((error) => {
+          console.log("Error sending message to sidebar:", error);
+        });
+        
+        // Also try to notify via content script (as a backup)
+        browser.tabs.sendMessage(tabId, { action: "checkForSidebar" })
+          .catch((error) => {
+            console.log("Content script not ready in tab:", tabId, error);
+            // Inject content script if it's not already there
+            browser.tabs.executeScript(tabId, {
+              file: "content-script.js"
+            }).catch((error) => {
+              console.log("Failed to inject content script:", error);
+            });
+          });
+      }).catch((error) => {
+        console.log("Error getting tab info:", error);
+      });
+    }
+  });
+}
 
 // Listen for messages from sidebar
 browser.runtime.onMessage.addListener((message, sender) => {
@@ -44,9 +71,9 @@ browser.runtime.onMessage.addListener((message, sender) => {
       })
       .then(results => {
         return { 
-          title: results[0].title,
-          url: results[0].url,
-          content: results[0].content
+          title: results.title,
+          url: results.url,
+          content: results.content
         };
       })
       .catch(error => {
@@ -56,3 +83,18 @@ browser.runtime.onMessage.addListener((message, sender) => {
   }
   return false;
 });
+
+// Add to background.js
+browser.tabs.onRemoved.addListener((tabId) => {
+  // Notify sidebar to remove this tab's context
+  browser.runtime.sendMessage({ 
+    action: "tabClosed", 
+    tabId: tabId 
+  });
+});
+
+// Add to sidebar.js
+if (message.action === "tabClosed") {
+  tabContexts.delete(message.tabId);
+}
+
