@@ -1,6 +1,6 @@
-# Web Content Summarization Sidebar for Firefox with Ollama
+# Sidekick: AI Web Assistant for Firefox
 
-A Firefox extension that provides a sidebar for summarizing web pages and interacting with locally running LLMs via Ollama.
+Sidekick is a Firefox extension that provides a sidebar for summarizing web pages and interacting with locally running LLMs via Ollama.
 
 <img src="media/slides.gif" alt="Web Content Summarization in Firefox" width="800" height="600">
 
@@ -13,6 +13,7 @@ This project consists of two main components:
    - Generate questions about the page content
    - Chat with an AI about the page content
    - Customize system prompts and model settings
+   - Reset conversations and context
 
 2. **Proxy Server**: A Python-based proxy that:
    - Handles CORS issues between the browser and local LLM servers
@@ -29,6 +30,8 @@ The extension works with locally running LLM models on Ollama, giving you privac
 - **Customizable Settings**: Configure your LLM endpoint, model, and system prompts
 - **Auto-summarize**: Option to automatically summarize pages when they load
 - **Clean Interface**: Sidebar design that doesn't interfere with browsing
+- **Context Management**: Automatically resets context when switching between tabs or navigating to new pages
+- **Conversation Reset**: Easily reset the current conversation and reload page content with a single click
 
 ## Prerequisites
 
@@ -49,7 +52,7 @@ The extension works with locally running LLM models on Ollama, giving you privac
 2. Package the extension:
    - Zip all the extension files (excluding the proxy folder and Docker files):
    ```
-   zip -r ffxaisidebar.zip manifest.json background.js content.js sidebar/ icons/ -x "*/\.*"
+   zip -r ffxaisidebar.zip manifest.json background.js content-script.js sidebar/ icons/ -x "*/\.*"
    ```
 
 ### Installing the Extension in Firefox
@@ -95,72 +98,40 @@ The proxy server is required to bypass CORS restrictions and allow the extension
 #### Using Docker Compose
 
 Alternatively, you can use Docker Compose:
+```
+cd proxy
+docker-compose up -d
+```
 
-1. Start the container:
-   ```
-   docker-compose up -d
-   ```
+## Usage
 
-2. Stop the container:
-   ```
-   docker-compose down
-   ```
+1. Click the extension icon in the Firefox toolbar or press `Ctrl+Shift+O` to open the sidebar
+2. Configure your settings (Ollama endpoint, model name, etc.)
+3. Browse to any webpage you want to analyze
+4. Click "Summarize This Page" to generate a summary
+5. Use the suggested questions or ask your own in the chat interface
+6. Use the "Reset Conversation" button to clear the current conversation and reload the page content
 
-## Using the Extension
+## Context Management
 
-1. Make sure your LLM server (Ollama) is running
-2. Make sure the proxy server is running
-3. Click the extension icon in the Firefox toolbar to open the sidebar
-4. Configure the settings:
-   - For Ollama: Set endpoint to `http://localhost:11434` and your model name (or `http://host.docker.internal:11434` when using the proxy as a Docker container)
-5. Navigate to any webpage you want to analyze
+The extension automatically handles context switching between tabs:
 
-### Summarizing Pages
+- When you switch to a different tab, the sidebar automatically resets and loads the content of the new tab
+- When you navigate to a new page within the same tab, the sidebar detects the change and resets accordingly
+- You can manually reset the conversation at any time using the reset button
 
-1. Open a webpage
-2. Click "Summarize This Page" in the sidebar
-3. Wait for the AI to generate a summary
-
-### Generating Questions
-
-1. After loading a page, click "Proposed Questions"
-2. The sidebar will display relevant questions about the page
-3. Click any question to ask it in the chat
-
-### Chatting About the Page
-
-1. Type your question in the chat input at the bottom of the sidebar
-2. Press Enter or click "Send"
-3. The AI will respond based on the page content
-
-### Customizing Settings
-
-Click the "Settings" header to expand the settings panel:
-
-- **Endpoint**: URL of your LLM server
-- **Model Name**: The model to use (e.g., `llama3` for Ollama)
-- **Max Content Length**: Maximum characters to send to the AI
-- **System Prompt**: Customize the AI's behavior and instructions
-- **Auto-summarize**: Toggle automatic summarization when loading pages
+This ensures that the AI always has the correct context for the page you're currently viewing.
 
 ## Troubleshooting
 
-- **"Failed to get page content" error**: Make sure you're on a regular webpage (not a Firefox internal page)
-- **No response from AI**: Check that Ollama and the proxy server are running
-- **Slow responses**: Try a smaller/faster model or reduce the Max Content Length
+- If the sidebar doesn't load content, check that the proxy server is running
+- If switching between tabs doesn't update the sidebar, try manually clicking the reset button
+- Check the browser console for any error messages (press F12 to open developer tools)
 
-## Privacy & Security
+## Contributing
 
-This extension:
-- Only sends data to your local LLM server, not to any external services
-- Requires permissions to read page content for summarization
-- Stores settings only in your browser's local storage
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-[MIT License](LICENSE)
-
-## Acknowledgments
-
-- This project uses [Ollama](https://github.com/ollama/ollama) for local LLM inference
-- Inspired by the need for private, local AI assistance while browsing
+This project is licensed under the MIT License - see the LICENSE file for details.
