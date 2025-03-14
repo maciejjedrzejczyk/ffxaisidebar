@@ -1,6 +1,8 @@
-# Ollama Sidebar for Firefox
+# Web Content Summarization Sidebar for Firefox with Ollama
 
 A Firefox extension that provides a sidebar for summarizing web pages and interacting with locally running LLMs via Ollama or LM Studio.
+
+<img src="media/slides.gif" alt="Web Content Summarization in Firefox" width="800" height="600">
 
 ## Solution Overview
 
