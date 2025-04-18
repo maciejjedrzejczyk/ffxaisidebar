@@ -23,8 +23,8 @@
           <input type="text" id="model" placeholder="llama3">
         </div>
         <div class="form-group">
-          <label for="max-length">Max Content Length:</label>
-          <input type="number" id="max-length" min="1000" max="10000" value="6000">
+          <label for="max-tokens">Max Tokens:</label>
+          <input type="number" id="max-tokens" min="1000" max="100000" value="8000">
         </div>
         <div class="form-group">
           <label for="system-prompt">System Prompt:</label>
@@ -47,13 +47,6 @@
     <div id="questions-container" class="questions-container"></div>
     
     <div class="status" id="status">Ready</div>
-    
-    <div class="summary-container">
-      <h2>Summary</h2>
-      <div id="summary" class="summary-content">
-        Click "Summarize This Page" to generate a summary.
-      </div>
-    </div>
     
     <div class="chat-container">
       <h2>Chat</h2>

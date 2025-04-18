@@ -1,7 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
   // DOM elements
   console.log("Sidebar DOM loaded");
-  const summaryElement = document.getElementById('summary');
   const statusElement = document.getElementById('status');
   const summarizeButton = document.getElementById('summarize-btn');
   const questionsButton = document.getElementById('questions-btn');
@@ -17,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Settings elements
   const endpointInput = document.getElementById('endpoint');
   const modelInput = document.getElementById('model');
-  const maxLengthInput = document.getElementById('max-length');
+  const maxTokensInput = document.getElementById('max-tokens');
   const systemPromptInput = document.getElementById('system-prompt');
   const autoSummarizeCheckbox = document.getElementById('auto-summarize');
   const tabContexts = new Map();
@@ -26,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
   let currentPageTitle = '';
   let currentPageUrl = '';
   let currentPageContent = null;
+  let currentTokenCount = 0;
   
   // Toggle settings panel
   settingsToggle.addEventListener('click', function() {
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const settings = {
       endpoint: endpointInput.value.trim(),
       model: modelInput.value.trim(),
-      maxLength: parseInt(maxLengthInput.value, 10),
+      maxTokens: parseInt(maxTokensInput.value, 10),
       systemPrompt: systemPromptInput.value.trim(),
       autoSummarize: autoSummarizeCheckbox.checked
     };
@@ -84,11 +84,11 @@ document.addEventListener('DOMContentLoaded', function() {
   function saveTabContext(tabId) {
     const context = {
       messages: document.querySelector('.chat-messages').innerHTML,
-      summary: document.getElementById('summary').innerHTML,
       questions: document.querySelector('.questions-container')?.innerHTML || '',
       pageContent: currentPageContent,
       pageTitle: currentPageTitle,
-      pageUrl: currentPageUrl
+      pageUrl: currentPageUrl,
+      tokenCount: currentTokenCount
     };
     
     tabContexts.set(tabId, context);
@@ -101,7 +101,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (context) {
       // Restore the saved context
       document.querySelector('.chat-messages').innerHTML = context.messages;
-      document.getElementById('summary').innerHTML = context.summary;
       if (document.querySelector('.questions-container')) {
         document.querySelector('.questions-container').innerHTML = context.questions;
       }
@@ -109,6 +108,13 @@ document.addEventListener('DOMContentLoaded', function() {
       currentPageContent = context.pageContent;
       currentPageTitle = context.pageTitle;
       currentPageUrl = context.pageUrl;
+      currentTokenCount = context.tokenCount || 0;
+      
+      if (currentTokenCount > 0) {
+        updateStatus(`Ready | Input: ${currentTokenCount} tokens`);
+      } else {
+        updateStatus('Ready');
+      }
       
       return true;
     }
@@ -162,30 +168,27 @@ document.addEventListener('DOMContentLoaded', function() {
       questionsContainer.innerHTML = '';
     }
     
-    // Reset the summary section
-    const summarySection = document.getElementById('summary');
-    if (summarySection) {
-      summarySection.innerHTML = 'Click "Summarize This Page" to generate a summary.';
-    }
-    
     // Clear any conversation history or context variables you might have
     currentPageContent = null;
     currentPageTitle = '';
     currentPageUrl = '';
+    
+    // Add a welcome message to the chat
+    addMessageToChat('assistant', 'Welcome to Sidekick! Click "Summarize This Page" to get started, or ask me a question about the current page.');
   }
   
   // Function to load settings
   function loadSettings() {
     chrome.storage.local.get([
       'endpoint', 
-      'model', 
-      'maxLength', 
+      'model',
+      'maxTokens',
       'systemPrompt',
       'autoSummarize'
     ]).then((result) => {
       endpointInput.value = result.endpoint || 'http://localhost:11434';
       modelInput.value = result.model || 'llama3';
-      maxLengthInput.value = result.maxLength || 6000;
+      maxTokensInput.value = result.maxTokens || 8000;
       systemPromptInput.value = result.systemPrompt || 'You are a helpful assistant that summarizes web content concisely and accurately.';
       autoSummarizeCheckbox.checked = result.autoSummarize || false;
     });
@@ -204,42 +207,33 @@ document.addEventListener('DOMContentLoaded', function() {
     if (chatInput) {
       chatInput.value = '';
     }
-    
-    // Clear the suggested questions container
+  
+    // Clear suggested questions
     const questionsContainer = document.querySelector('.questions-container');
     if (questionsContainer) {
       questionsContainer.innerHTML = '';
     }
-    
-    // Clear the summary section
-    const summarySection = document.getElementById('summary');
-    if (summarySection) {
-      summarySection.innerHTML = 'Click "Summarize This Page" to generate a summary.';
-    }
-    
-    // Clear the page content cache
+  
+    // Clear any conversation history or context variables
     currentPageContent = null;
-    currentPageTitle = "";
-    currentPageUrl = "";
-    
-    // Update the status
-    updateStatus('Conversation reset. Ready for new interactions.');
-    
-    // Reload the current page content
-    updatePageContentCache();
-  }
+    currentPageTitle = '';
+    currentPageUrl = '';
+    currentTokenCount = 0;
   
-  // Function to update status
-  function updateStatus(message) {
-    const statusElement = document.getElementById('status');
-    if (statusElement) {
-      statusElement.textContent = message;
-      console.log("Status updated:", message);
-    } else {
-      console.error("Status element not found");
-    }
+    // Update page content cache
+    updatePageContentCache().then(() => {
+      // Add a welcome message to the chat
+      addMessageToChat('assistant', 'Welcome to Sidekick! Click "Summarize This Page" to get started, or ask me a question about the current page.');
+    });
   }
-  
+
+  // Function to estimate token count
+  function estimateTokenCount(text) {
+    if (!text) return 0;
+    // A rough estimate: 1 token is approximately 4 characters for English text
+    return Math.ceil(text.length / 4);
+  }
+
   // Function to update page content cache
   async function updatePageContentCache() {
     try {
@@ -260,11 +254,18 @@ document.addEventListener('DOMContentLoaded', function() {
             currentPageTitle = response.title;
             currentPageUrl = response.url;
             
+            // Calculate token count
+            currentTokenCount = estimateTokenCount(currentPageContent);
+            
             console.log("Page content updated:", {
               title: currentPageTitle,
               url: currentPageUrl,
-              contentLength: currentPageContent ? currentPageContent.length : 0
+              contentLength: currentPageContent ? currentPageContent.length : 0,
+              tokenCount: currentTokenCount
             });
+            
+            // Update status with token count
+            updateStatus(`Ready | Input: ${currentTokenCount} tokens`);
             
             resolve(true);
           } else {
@@ -276,6 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
               currentPageTitle = response.title;
               currentPageUrl = response.url || "Unknown URL";
               currentPageContent = response.content || "No content available";
+              currentTokenCount = estimateTokenCount(currentPageContent);
               resolve(true);
             } else {
               resolve(false);
@@ -289,10 +291,10 @@ document.addEventListener('DOMContentLoaded', function() {
       return false;
     }
   }
-  
+
   // Function to summarize current page
   async function summarizeCurrentPage() {
-    updateStatus('Extracting page content...');
+    updateStatus(`Processing | Input: ${currentTokenCount} tokens`);
     summarizeButton.disabled = true;
     
     try {
@@ -309,25 +311,56 @@ document.addEventListener('DOMContentLoaded', function() {
         throw new Error("Page content is empty or unavailable");
       }
       
-      updateStatus('Sending to Ollama via proxy...');
+      updateStatus(`Sending to Ollama | Input: ${currentTokenCount} tokens`);
       
       // Get settings
       const settings = await chrome.storage.local.get([
         'endpoint', 
-        'model', 
-        'maxLength',
+        'model',
+        'maxTokens',
         'systemPrompt'
       ]);
       
       const endpoint = settings.endpoint || 'http://localhost:11434';
       const model = settings.model || 'llama3';
-      const maxLength = settings.maxLength || 6000;
+      const maxTokens = settings.maxTokens || 8000;
       const systemPrompt = settings.systemPrompt || 'You are a helpful assistant that summarizes web content concisely and accurately.';
       
       // Prepare the prompt with safety checks
       const safeTitle = currentPageTitle || "Untitled Page";
       const safeUrl = currentPageUrl || "No URL available";
       const safeContent = currentPageContent || "No content available";
+      
+      // Add a user message to the chat indicating a summary was requested
+      addMessageToChat('user', `Please summarize this page: ${safeTitle}`);
+      
+      // Add a loading message that will be replaced with the actual summary
+      const loadingMessage = addMessageToChat('assistant', 'Generating summary...');
+      
+      // Calculate optimal content length based on token count
+      // For very large pages, we'll use a sliding window approach
+      let contentToSend = safeContent;
+      let actualInputTokens = currentTokenCount;
+      
+      if (currentTokenCount > maxTokens) {
+        // If content is too large, take the first part and a sample from the middle and end
+        const firstPart = Math.floor(maxTokens * 0.6); // 60% from the beginning
+        const middlePart = Math.floor(maxTokens * 0.2); // 20% from the middle
+        const lastPart = Math.floor(maxTokens * 0.2); // 20% from the end
+        
+        const firstSection = safeContent.substring(0, firstPart * 4); // Convert tokens to chars
+        
+        const middleStart = Math.floor(safeContent.length / 2) - (middlePart * 2);
+        const middleSection = safeContent.substring(middleStart, middleStart + (middlePart * 4));
+        
+        const lastStart = safeContent.length - (lastPart * 4);
+        const lastSection = safeContent.substring(lastStart);
+        
+        contentToSend = `${firstSection}\n\n[...content truncated...]\n\n${middleSection}\n\n[...content truncated...]\n\n${lastSection}`;
+        actualInputTokens = maxTokens;
+        
+        updateStatus(`Processing | Input: ${maxTokens} tokens (truncated from ${currentTokenCount})`);
+      }
       
       const prompt = `${systemPrompt}
       
@@ -337,7 +370,7 @@ Title: ${safeTitle}
 URL: ${safeUrl}
 
 Content:
-${safeContent.substring(0, maxLength)}
+${contentToSend}
 
 Summary:`;
       
@@ -370,18 +403,22 @@ Summary:`;
       if (data.error) {
         throw new Error(data.error);
       } else {
-        summaryElement.textContent = data.response;
-        updateStatus('Summary generated successfully!');
+        // Replace the loading message with the actual summary
+        loadingMessage.textContent = data.response;
+        
+        // Calculate response tokens
+        const responseTokens = estimateTokenCount(data.response);
+        updateStatus(`Ready | Input: ${actualInputTokens} tokens | Output: ${responseTokens} tokens`);
       }
     } catch (error) {
       console.error("Error in summarize:", error);
       
       if (error.name === 'AbortError') {
         updateStatus('Error: Request timed out');
-        summaryElement.textContent = "Request timed out after 90 seconds. The Ollama server might be busy or the model might be too large for the current request.";
+        loadingMessage.textContent = "Request timed out after 90 seconds. The Ollama server might be busy or the model might be too large for the current request.";
       } else {
         updateStatus('Error: ' + error.message);
-        summaryElement.textContent = `Failed to generate summary: ${error.message}`;
+        loadingMessage.textContent = `Failed to generate summary: ${error.message}`;
       }
     } finally {
       summarizeButton.disabled = false;
@@ -390,7 +427,7 @@ Summary:`;
   
   // Function to generate questions about the page
   async function generateQuestions() {
-    updateStatus('Generating questions...');
+    updateStatus(`Processing | Input: ${currentTokenCount} tokens`);
     questionsButton.disabled = true;
     questionsContainer.innerHTML = '';
     
@@ -411,20 +448,51 @@ Summary:`;
       // Get settings
       const settings = await chrome.storage.local.get([
         'endpoint', 
-        'model', 
-        'maxLength',
+        'model',
+        'maxTokens',
         'systemPrompt'
       ]);
       
       const endpoint = settings.endpoint || 'http://localhost:11434';
       const model = settings.model || 'llama3';
-      const maxLength = settings.maxLength || 6000;
+      const maxTokens = settings.maxTokens || 8000;
       const systemPrompt = settings.systemPrompt || 'You are a helpful assistant that summarizes web content concisely and accurately.';
       
       // Prepare the prompt with safety checks
       const safeTitle = currentPageTitle || "Untitled Page";
       const safeUrl = currentPageUrl || "No URL available";
       const safeContent = currentPageContent || "No content available";
+      
+      // Add a user message to the chat indicating questions were requested
+      addMessageToChat('user', `What are some interesting questions about this page?`);
+      
+      // Add a loading message that will be replaced with the actual questions
+      const loadingMessage = addMessageToChat('assistant', 'Generating questions...');
+      
+      // Calculate optimal content length based on token count
+      // For very large pages, we'll use a sliding window approach
+      let contentToSend = safeContent;
+      let actualInputTokens = currentTokenCount;
+      
+      if (currentTokenCount > maxTokens) {
+        // If content is too large, take the first part and a sample from the middle and end
+        const firstPart = Math.floor(maxTokens * 0.6); // 60% from the beginning
+        const middlePart = Math.floor(maxTokens * 0.2); // 20% from the middle
+        const lastPart = Math.floor(maxTokens * 0.2); // 20% from the end
+        
+        const firstSection = safeContent.substring(0, firstPart * 4); // Convert tokens to chars
+        
+        const middleStart = Math.floor(safeContent.length / 2) - (middlePart * 2);
+        const middleSection = safeContent.substring(middleStart, middleStart + (middlePart * 4));
+        
+        const lastStart = safeContent.length - (lastPart * 4);
+        const lastSection = safeContent.substring(lastStart);
+        
+        contentToSend = `${firstSection}\n\n[...content truncated...]\n\n${middleSection}\n\n[...content truncated...]\n\n${lastSection}`;
+        actualInputTokens = maxTokens;
+        
+        updateStatus(`Processing | Input: ${maxTokens} tokens (truncated from ${currentTokenCount})`);
+      }
       
       const prompt = `${systemPrompt}
       
@@ -434,7 +502,7 @@ Title: ${safeTitle}
 URL: ${safeUrl}
 
 Content:
-${safeContent.substring(0, maxLength)}
+${contentToSend}
 
 Questions:`;
       
@@ -467,6 +535,9 @@ Questions:`;
       if (data.error) {
         throw new Error(data.error);
       } else {
+        // Replace loading message with the actual response
+        loadingMessage.textContent = data.response;
+        
         // Parse questions from response
         const questionsText = data.response;
         const questionLines = questionsText.split('\n')
@@ -490,15 +561,19 @@ Questions:`;
           questionsContainer.appendChild(button);
         });
         
-        updateStatus('Questions generated!');
+        // Calculate response tokens
+        const responseTokens = estimateTokenCount(data.response);
+        updateStatus(`Ready | Input: ${actualInputTokens} tokens | Output: ${responseTokens} tokens`);
       }
     } catch (error) {
       console.error("Error generating questions:", error);
       
       if (error.name === 'AbortError') {
         updateStatus('Error: Request timed out');
+        loadingMessage.textContent = "Request timed out after 90 seconds. The Ollama server might be busy or the model might be too large for the current request.";
       } else {
-        updateStatus('Error: ' + error.message);
+        updateStatus(`Error: ${error.message}`);
+        loadingMessage.textContent = `Failed to generate questions: ${error.message}`;
       }
     } finally {
       questionsButton.disabled = false;
@@ -537,17 +612,46 @@ Questions:`;
       const settings = await chrome.storage.local.get([
         'endpoint', 
         'model',
+        'maxTokens',
         'systemPrompt'
       ]);
       
       const endpoint = settings.endpoint || 'http://localhost:11434';
       const model = settings.model || 'llama3';
+      const maxTokens = settings.maxTokens || 8000;
       const systemPrompt = settings.systemPrompt || 'You are a helpful assistant that summarizes web content concisely and accurately.';
       
       // Prepare the prompt with safety checks
       const safeTitle = currentPageTitle || "Untitled Page";
       const safeUrl = currentPageUrl || "No URL available";
       const safeContent = currentPageContent || "No content available";
+      
+      // Calculate optimal content length based on token count
+      // For very large pages, we'll use a sliding window approach
+      let contentToSend = safeContent;
+      let actualInputTokens = currentTokenCount;
+      
+      if (currentTokenCount > maxTokens) {
+        // If content is too large, take the first part and a sample from the middle and end
+        const firstPart = Math.floor(maxTokens * 0.6); // 60% from the beginning
+        const middlePart = Math.floor(maxTokens * 0.2); // 20% from the middle
+        const lastPart = Math.floor(maxTokens * 0.2); // 20% from the end
+        
+        const firstSection = safeContent.substring(0, firstPart * 4); // Convert tokens to chars
+        
+        const middleStart = Math.floor(safeContent.length / 2) - (middlePart * 2);
+        const middleSection = safeContent.substring(middleStart, middleStart + (middlePart * 4));
+        
+        const lastStart = safeContent.length - (lastPart * 4);
+        const lastSection = safeContent.substring(lastStart);
+        
+        contentToSend = `${firstSection}\n\n[...content truncated...]\n\n${middleSection}\n\n[...content truncated...]\n\n${lastSection}`;
+        actualInputTokens = maxTokens;
+        
+        updateStatus(`Processing | Input: ${maxTokens} tokens (truncated from ${currentTokenCount})`);
+      } else {
+        updateStatus(`Processing | Input: ${currentTokenCount} tokens`);
+      }
       
       const prompt = `${systemPrompt}
       
@@ -556,12 +660,12 @@ You are answering questions about the following webpage:
 Title: ${safeTitle}
 URL: ${safeUrl}
 
-Content snippet:
-${safeContent.substring(0, 3000)}
+Content:
+${contentToSend}
 
 User question: ${userMessage}
 
-Please provide a helpful, accurate, and concise answer based on the webpage content.`;
+Please provide a helpful and accurate response based on the webpage content.`;
       
       // Set up timeout for fetch
       const controller = new AbortController();
@@ -592,24 +696,29 @@ Please provide a helpful, accurate, and concise answer based on the webpage cont
       if (data.error) {
         throw new Error(data.error);
       } else {
-        // Remove loading message
-        loadingMessage.remove();
+        // Replace the loading message with the actual response
+        loadingMessage.textContent = data.response;
         
-        // Add assistant's response to chat
-        addMessageToChat('assistant', data.response);
+        // Calculate response tokens
+        const responseTokens = estimateTokenCount(data.response);
+        updateStatus(`Ready | Input: ${actualInputTokens} tokens | Output: ${responseTokens} tokens`);
       }
     } catch (error) {
       console.error("Error in chat:", error);
       
-      // Remove loading message
-      loadingMessage.remove();
-      
       if (error.name === 'AbortError') {
-        addMessageToChat('assistant', "I'm sorry, but the request timed out. The server might be busy.");
+        updateStatus('Error: Request timed out');
+        loadingMessage.textContent = "Request timed out after 90 seconds. The Ollama server might be busy or the model might be too large for the current request.";
       } else {
-        addMessageToChat('assistant', `I'm sorry, but an error occurred: ${error.message}`);
+        updateStatus('Error: ' + error.message);
+        loadingMessage.textContent = `Error: ${error.message}`;
       }
     }
+  }
+  
+  // Function to update status
+  function updateStatus(message) {
+    statusElement.textContent = message;
   }
   
   // Function to add a message to the chat
@@ -633,14 +742,15 @@ Please provide a helpful, accurate, and concise answer based on the webpage cont
     // Scroll to bottom
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
-    return messageDiv;
+    return messageText; // Return the text element so it can be updated later
   }
   
   // Initialize by checking if we need to update the page content cache
   // Wait a moment before trying to get page content to ensure everything is ready
   setTimeout(() => {
     updatePageContentCache().then(() => {
-      updateStatus("Ready");
+      // Add welcome message
+      addMessageToChat('assistant', 'Welcome to Sidekick! Click "Summarize This Page" to get started, or ask me a question about the current page.');
     });
   }, 1000);
 });
