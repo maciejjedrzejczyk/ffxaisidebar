@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Sidekick</h1>
+    
+    <div class="settings-section">
+      <div class="settings-header" id="settings-toggle">
+        <h2>Settings</h2>
+        <span class="toggle-icon">▼</span>
+      </div>
+      <div class="settings-content" id="settings-content">
+        <div class="form-group">
+          <label for="endpoint">Ollama Endpoint:</label>
+          <input type="text" id="endpoint" placeholder="http://localhost:11434">
+        </div>
+        <div class="form-group">
+          <label for="model">Model Name:</label>
+          <input type="text" id="model" placeholder="llama3">
+        </div>
+        <div class="form-group">
+          <label for="max-length">Max Content Length:</label>
+          <input type="number" id="max-length" min="1000" max="10000" value="6000">
+        </div>
+        <div class="form-group">
+          <label for="system-prompt">System Prompt:</label>
+          <textarea id="system-prompt" rows="4" placeholder="You are a helpful assistant that summarizes web content concisely and accurately."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="auto-summarize">Auto-summarize on page load:</label>
+          <input type="checkbox" id="auto-summarize">
+        </div>
+        <button id="save-settings">Save Settings</button>
+      </div>
+    </div>
+    
+    <div class="actions">
+      <button id="summarize-btn">Summarize This Page</button>
+      <button id="questions-btn">Proposed Questions</button>
+      <button id="reset-conversation" class="reset-button">Reset Conversation</button>
+    </div>
+    
+    <div id="questions-container" class="questions-container"></div>
+    
+    <div class="status" id="status">Ready</div>
+    
+    <div class="summary-container">
+      <h2>Summary</h2>
+      <div id="summary" class="summary-content">
+        Click "Summarize This Page" to generate a summary.
+      </div>
+    </div>
+    
+    <div class="chat-container">
+      <h2>Chat</h2>
+      <div id="chat-messages" class="chat-messages"></div>
+      <div class="chat-input-container">
+        <textarea id="chat-input" placeholder="Ask a question about this page..."></textarea>
+        <button id="chat-send">Send</button>
+      </div>
+    </div>
+  </div>
+  <script src="sidebar.js"></script>
+</body>
+</html>
